@@ -1,0 +1,1858 @@
+import React, { useState, useEffect, useRef, createContext, useContext } from "react";
+// ─── STORAGE ──────────────────────────────────────────────────────────────────
+
+const KEY = "ironlog_v2";
+
+function load() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return { programs: [], activeProgId: null, logs: [] };
+    const d = JSON.parse(raw);
+    if (d.program && !d.programs) {
+      return { programs: [{ ...d.program, id: "migrated" }], activeProgId: "migrated", logs: d.logs || [] };
+    }
+    return d;
+  } catch { return { programs: [], activeProgId: null, logs: [] }; }
+}
+function persist(d) { localStorage.setItem(KEY, JSON.stringify(d)); }
+
+
+// ─── THEME ────────────────────────────────────────────────────────────────────
+
+const DARK = {
+  bg:       "#0f0f12",
+  surface:  "#16161a",
+  card:     "#1c1c21",
+  border:   "#2a2a32",
+  accent:   "#4f8ef7",
+  accentDim:"#4f8ef718",
+  accentMid:"#4f8ef740",
+  text:     "#eaeaf0",
+  sub:      "#8888a0",
+  muted:    "#44445a",
+  green:    "#34d399",
+  greenDim: "#34d39920",
+};
+
+const LIGHT = {
+  bg:       "#f5f5f7",
+  surface:  "#ffffff",
+  card:     "#ffffff",
+  border:   "#e0e0e8",
+  accent:   "#3a7ef5",
+  accentDim:"#3a7ef512",
+  accentMid:"#3a7ef535",
+  text:     "#111118",
+  sub:      "#666680",
+  muted:    "#b0b0c0",
+  green:    "#16a97a",
+  greenDim: "#16a97a18",
+};
+
+const ThemeCtx = createContext(DARK);
+const useC = () => useContext(ThemeCtx);
+
+// ─── LANGUAGE ─────────────────────────────────────────────────────────────────
+
+const LANGS = {
+  en: {
+    session: "Session", history: "History", progress: "Progress", program: "Program",
+    whatTraining: "What are you training?", todaySession: "TODAY'S SESSION",
+    startArrow: "Start →", last: "Last", autoSaving: "Auto-saving",
+    saveFailed: "Save failed — storage full", resumeSession: "Resume session",
+    discard: "Discard", keepIt: "Keep it", yesDiscard: "Yes, discard",
+    discardTitle: "Discard this session?", discardBody: "All logged sets for",
+    discardBody2: "will be lost. This can't be undone.",
+    unfinished: "Unfinished session —", pickUp: "You have a session in progress. Pick up where you left off?",
+    lastSession: "Last session:", prevShown: "— previous numbers shown below each set",
+    addSet: "+ Add set", saveSession: "Save session", sessionNotes: "Session notes",
+    notesPlaceholder: "How did it feel? Any PRs, injuries, things to remember...",
+    sessionDone: "Session done.", sessionSaved: "Session saved.",
+    newPRToday: "new PR today", done: "Done", exercises: "Exercises", sets: "Sets", prs: "PRs",
+    noProgram: "No program set up", noProgramSub: "Go to the Program tab to create your first program, then set it as active.",
+    addTrainingDay: "Add a training day", addTrainingDaySub: "Edit your program to add more days",
+    unit: "Unit:", change: "change",
+    myPrograms: "MY PROGRAMS", programs: "Programs", importBtn: "+ Import", newBtn: "+ New",
+    importTitle: "Import a program", importSub: "Paste a program code shared by a friend. It'll be added to your programs without touching anything else.",
+    importPlaceholder: "Paste program code here...", addProgram: "Add program", cancel: "Cancel",
+    importSuccess: "✓ Program added successfully", importError: "Invalid code — make sure you paste the full thing.",
+    shareTitle: "Share", shareSub: "Copy this code and send it to a friend. They paste it in the Import panel to add it to their app.",
+    copyCode: "Copy code", close: "Close", copied: "✓ Copied — send it to your friend",
+    noPrograms: "👋 No programs yet", noProgramsSub: "Create your first program — add your training days and exercises. You can have multiple programs and switch between them anytime.",
+    active: "ACTIVE", setActive: "Set active", edit: "Edit", share: "Share", deleteBtn: "Delete",
+    deleteConfirm: "This can't be undone.", yesDelete: "Yes, delete",
+    programName: "Program Name", programNamePlaceholder: "e.g. Push Pull Legs",
+    addExercise: "+ Add exercise", addTrainingDayBtn: "👇 Add training day here", addTrainingDayBtnDefault: "+ Add training day",
+    saveProgram: "Save program", savedProgram: "✓ Saved", newProgram: "New Program",
+    dayPlaceholder: "Day name (e.g. Push)", exercisePlaceholder: "Exercise",
+    allTime: "ALL TIME", noSessions: "No sessions yet", noSessionsFor: "No sessions logged for",
+    sessionsPlaceholder: "Your logged sessions will appear here",
+    editSession: "✏️ Edit session", editingSession: "EDITING SESSION", saveChanges: "Save changes",
+    notes: "NOTES",
+    allPrograms: "ALL PROGRAMS", noData: "No data yet", logToSee: "Log sessions to track your progress",
+    logFor: "Log sessions for", toSeeProgress: "to see progress",
+    bestWeight: "Best weight per session", starting: "Starting", current: "Current", change: "Change", sessions: "Sessions",
+    logMoreSessions: "Log more sessions to see a trend",
+    welcomeTo: "Welcome to", trackLift: "Track every lift. See every gain. Takes 60 seconds to set up.",
+    letsGo: "Let's go →", skipForNow: "Skip for now",
+    nameYourProgram: "Name your program", nameYourProgramSub: "Push Pull Legs? Upper Lower? 5/3/1? Whatever you're running — give it a name.",
+    namePlaceholder: "e.g. Push Pull Legs", nextArrow: "Next →",
+    firstTrainingDay: "Your first training day", firstTrainingDaySub: "Add one day and a few exercises to get started. You can add more later.",
+    dayName: "Day name", dayPlaceholderOB: "e.g. Push", exercisesLabel: "Exercises",
+    addExerciseOB: "+ Add exercise", startTraining: "Start training →",
+    moreDays: "You can add more days anytime in the", programTab: "Program", moreDays2: "tab.",
+    reps: "reps", failure: "Failure",
+    firstLog: "First log!", newPR: "New PR", setsLogged: "sets logged", setLogged: "set logged",
+  },
+  fr: {
+    session: "Séance", history: "Historique", progress: "Progrès", program: "Programme",
+    whatTraining: "Qu'est-ce que tu t'entraînes ?", todaySession: "SÉANCE DU JOUR",
+    startArrow: "Commencer →", last: "Dernier", autoSaving: "Sauvegarde auto",
+    saveFailed: "Échec de sauvegarde — stockage plein", resumeSession: "Reprendre la séance",
+    discard: "Abandonner", keepIt: "Garder", yesDiscard: "Oui, abandonner",
+    discardTitle: "Abandonner cette séance ?", discardBody: "Toutes les séries de",
+    discardBody2: "seront perdues. Impossible d'annuler.",
+    unfinished: "Séance non terminée —", pickUp: "Tu as une séance en cours. Reprendre où tu t'es arrêté ?",
+    lastSession: "Dernière séance :", prevShown: "— chiffres précédents affichés sous chaque série",
+    addSet: "+ Ajouter une série", saveSession: "Enregistrer la séance", sessionNotes: "Notes de séance",
+    notesPlaceholder: "Comment c'était ? PRs, blessures, choses à retenir...",
+    sessionDone: "Séance terminée.", sessionSaved: "Séance enregistrée.",
+    newPRToday: "nouveau PR aujourd'hui", done: "Terminé", exercises: "Exercices", sets: "Séries", prs: "PRs",
+    noProgram: "Aucun programme configuré", noProgramSub: "Va dans l'onglet Programme pour créer ton premier programme.",
+    addTrainingDay: "Ajouter un jour d'entraînement", addTrainingDaySub: "Modifie ton programme pour ajouter des jours",
+    unit: "Unité :", change: "changer",
+    myPrograms: "MES PROGRAMMES", programs: "Programmes", importBtn: "+ Importer", newBtn: "+ Nouveau",
+    importTitle: "Importer un programme", importSub: "Colle un code partagé par un ami. Il sera ajouté sans toucher à tes données.",
+    importPlaceholder: "Colle le code ici...", addProgram: "Ajouter le programme", cancel: "Annuler",
+    importSuccess: "✓ Programme ajouté avec succès", importError: "Code invalide — assure-toi de tout coller.",
+    shareTitle: "Partager", shareSub: "Copie ce code et envoie-le à un ami. Il le colle dans le panneau d'import.",
+    copyCode: "Copier le code", close: "Fermer", copied: "✓ Copié — envoie-le à ton ami",
+    noPrograms: "👋 Aucun programme", noProgramsSub: "Crée ton premier programme — ajoute tes jours et exercices.",
+    active: "ACTIF", setActive: "Activer", edit: "Modifier", share: "Partager", deleteBtn: "Supprimer",
+    deleteConfirm: "Cette action est irréversible.", yesDelete: "Oui, supprimer",
+    programName: "Nom du programme", programNamePlaceholder: "ex. Push Pull Legs",
+    addExercise: "+ Ajouter un exercice", addTrainingDayBtn: "👇 Ajouter un jour ici", addTrainingDayBtnDefault: "+ Ajouter un jour",
+    saveProgram: "Enregistrer", savedProgram: "✓ Enregistré", newProgram: "Nouveau Programme",
+    dayPlaceholder: "Nom du jour (ex. Push)", exercisePlaceholder: "Exercice",
+    allTime: "DEPUIS TOUJOURS", noSessions: "Aucune séance", noSessionsFor: "Aucune séance pour",
+    sessionsPlaceholder: "Tes séances apparaîtront ici",
+    editSession: "✏️ Modifier la séance", editingSession: "MODIFICATION", saveChanges: "Enregistrer",
+    notes: "NOTES",
+    allPrograms: "TOUS LES PROGRAMMES", noData: "Aucune donnée", logToSee: "Enregistre des séances pour suivre tes progrès",
+    logFor: "Enregistre des séances pour", toSeeProgress: "pour voir les progrès",
+    bestWeight: "Meilleur poids par séance", starting: "Début", current: "Actuel", change: "Évolution", sessions: "Séances",
+    logMoreSessions: "Enregistre plus de séances pour voir une tendance",
+    welcomeTo: "Bienvenue sur", trackLift: "Suis chaque série. Vois chaque progrès. 60 secondes pour configurer.",
+    letsGo: "C'est parti →", skipForNow: "Passer pour l'instant",
+    nameYourProgram: "Nomme ton programme", nameYourProgramSub: "Push Pull Legs ? Upper Lower ? 5/3/1 ? Donne-lui un nom.",
+    namePlaceholder: "ex. Push Pull Legs", nextArrow: "Suivant →",
+    firstTrainingDay: "Ton premier jour d'entraînement", firstTrainingDaySub: "Ajoute un jour et quelques exercices pour commencer.",
+    dayName: "Nom du jour", dayPlaceholderOB: "ex. Push", exercisesLabel: "Exercices",
+    addExerciseOB: "+ Ajouter un exercice", startTraining: "Commencer →",
+    moreDays: "Tu peux ajouter des jours dans l'onglet", programTab: "Programme", moreDays2: ".",
+    reps: "reps", failure: "Échec",
+    firstLog: "Premier log !", newPR: "Nouveau PR", setsLogged: "séries loggées", setLogged: "série loggée",
+  },
+  es: {
+    session: "Sesión", history: "Historial", progress: "Progreso", program: "Programa",
+    whatTraining: "¿Qué vas a entrenar?", todaySession: "SESIÓN DE HOY",
+    startArrow: "Empezar →", last: "Último", autoSaving: "Guardado auto",
+    saveFailed: "Error al guardar — almacenamiento lleno", resumeSession: "Retomar sesión",
+    discard: "Descartar", keepIt: "Conservar", yesDiscard: "Sí, descartar",
+    discardTitle: "¿Descartar esta sesión?", discardBody: "Todas las series de",
+    discardBody2: "se perderán. No se puede deshacer.",
+    unfinished: "Sesión incompleta —", pickUp: "Tienes una sesión en curso. ¿Continuar donde lo dejaste?",
+    lastSession: "Última sesión:", prevShown: "— números anteriores mostrados bajo cada serie",
+    addSet: "+ Añadir serie", saveSession: "Guardar sesión", sessionNotes: "Notas de sesión",
+    notesPlaceholder: "¿Cómo fue? PRs, lesiones, cosas a recordar...",
+    sessionDone: "Sesión completada.", sessionSaved: "Sesión guardada.",
+    newPRToday: "nuevo PR hoy", done: "Listo", exercises: "Ejercicios", sets: "Series", prs: "PRs",
+    noProgram: "Sin programa configurado", noProgramSub: "Ve a la pestaña Programa para crear tu primer programa.",
+    addTrainingDay: "Añadir día de entrenamiento", addTrainingDaySub: "Edita tu programa para añadir días",
+    unit: "Unidad:", change: "cambiar",
+    myPrograms: "MIS PROGRAMAS", programs: "Programas", importBtn: "+ Importar", newBtn: "+ Nuevo",
+    importTitle: "Importar un programa", importSub: "Pega un código compartido por un amigo. Se añadirá sin tocar tus datos.",
+    importPlaceholder: "Pega el código aquí...", addProgram: "Añadir programa", cancel: "Cancelar",
+    importSuccess: "✓ Programa añadido correctamente", importError: "Código inválido — asegúrate de pegar todo.",
+    shareTitle: "Compartir", shareSub: "Copia este código y envíaselo a un amigo.",
+    copyCode: "Copiar código", close: "Cerrar", copied: "✓ Copiado — envíaselo a tu amigo",
+    noPrograms: "👋 Sin programas", noProgramsSub: "Crea tu primer programa — añade tus días y ejercicios.",
+    active: "ACTIVO", setActive: "Activar", edit: "Editar", share: "Compartir", deleteBtn: "Eliminar",
+    deleteConfirm: "Esta acción no se puede deshacer.", yesDelete: "Sí, eliminar",
+    programName: "Nombre del programa", programNamePlaceholder: "ej. Push Pull Legs",
+    addExercise: "+ Añadir ejercicio", addTrainingDayBtn: "👇 Añadir día aquí", addTrainingDayBtnDefault: "+ Añadir día",
+    saveProgram: "Guardar", savedProgram: "✓ Guardado", newProgram: "Nuevo Programa",
+    dayPlaceholder: "Nombre del día (ej. Push)", exercisePlaceholder: "Ejercicio",
+    allTime: "TODO EL TIEMPO", noSessions: "Sin sesiones", noSessionsFor: "Sin sesiones para",
+    sessionsPlaceholder: "Tus sesiones aparecerán aquí",
+    editSession: "✏️ Editar sesión", editingSession: "EDITANDO", saveChanges: "Guardar cambios",
+    notes: "NOTAS",
+    allPrograms: "TODOS LOS PROGRAMAS", noData: "Sin datos", logToSee: "Registra sesiones para ver tu progreso",
+    logFor: "Registra sesiones para", toSeeProgress: "para ver el progreso",
+    bestWeight: "Mejor peso por sesión", starting: "Inicio", current: "Actual", change: "Cambio", sessions: "Sesiones",
+    logMoreSessions: "Registra más sesiones para ver una tendencia",
+    welcomeTo: "Bienvenido a", trackLift: "Registra cada serie. Ve cada progreso. 60 segundos para configurar.",
+    letsGo: "¡Vamos! →", skipForNow: "Saltar por ahora",
+    nameYourProgram: "Nombra tu programa", nameYourProgramSub: "¿Push Pull Legs? ¿Upper Lower? ¿5/3/1? Dale un nombre.",
+    namePlaceholder: "ej. Push Pull Legs", nextArrow: "Siguiente →",
+    firstTrainingDay: "Tu primer día de entrenamiento", firstTrainingDaySub: "Añade un día y algunos ejercicios para empezar.",
+    dayName: "Nombre del día", dayPlaceholderOB: "ej. Push", exercisesLabel: "Ejercicios",
+    addExerciseOB: "+ Añadir ejercicio", startTraining: "Empezar →",
+    moreDays: "Puedes añadir más días en la pestaña", programTab: "Programa", moreDays2: ".",
+    reps: "reps", failure: "Fallo",
+    firstLog: "¡Primer registro!", newPR: "Nuevo PR", setsLogged: "series registradas", setLogged: "serie registrada",
+  },
+};
+
+const LangCtx = createContext(LANGS.en);
+const useT = () => useContext(LangCtx);
+
+const F = { heading: "'DM Sans', sans-serif", mono: "'DM Mono', monospace" };
+
+// ─── SHARED STYLES ─────────────────────────────────────────────────────────────
+
+const page = { padding: "20px 16px 100px", minHeight: "100vh" };
+const F_label = { fontSize: 10, letterSpacing: 1.5, textTransform: "uppercase", display: "block", marginBottom: 5, fontWeight: 600 };
+const F_divider = { height: 1, margin: "14px 0" };
+
+function Inp({ value, onChange, placeholder, type = "text", style = {} }) {
+  const C = useC();
+  return (
+    <input
+      type={type} value={value} onChange={onChange} placeholder={placeholder}
+      style={{
+        background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8,
+        color: C.text, padding: "10px 12px", fontSize: 14,
+        outline: "none", fontFamily: F.heading, width: "100%",
+        boxSizing: "border-box", ...style,
+      }}
+    />
+  );
+}
+
+function Btn({ children, onClick, variant = "primary", style = {}, disabled = false }) {
+  const C = useC();
+  const base = {
+    border: "none", borderRadius: 9, cursor: disabled ? "default" : "pointer",
+    fontFamily: F.heading, fontWeight: 600, fontSize: 13,
+    padding: "10px 16px", transition: "opacity .15s", letterSpacing: .3,
+    opacity: disabled ? 0.4 : 1,
+  };
+  const variants = {
+    primary: { background: C.accent, color: "#fff" },
+    ghost:   { background: "transparent", color: C.sub, border: `1px solid ${C.border}` },
+    danger:  { background: "transparent", color: "#f87171", border: `1px solid #f8717130` },
+    success: { background: C.green, color: "#fff" },
+  };
+  return <button onClick={!disabled ? onClick : undefined} style={{ ...base, ...variants[variant], ...style }}>{children}</button>;
+}
+
+function Card({ children, style = {}, highlight = false }) {
+  const C = useC();
+  return (
+    <div style={{
+      background: C.card, borderRadius: 12,
+      border: `1px solid ${highlight ? C.accent : C.border}`,
+      padding: 16, marginBottom: 10,
+      boxShadow: "0 1px 3px #00000010",
+      ...style,
+    }}>{children}</div>
+  );
+}
+
+// helper hooks for label/divider that need C
+function useLabel() {
+  const C = useC();
+  return { ...F_label, color: C.sub };
+}
+function useDivider() {
+  const C = useC();
+  return { ...F_divider, background: C.border };
+}
+
+// ─── NAV ─────────────────────────────────────────────────────────────────────
+
+const TABS = [
+  { id: "session", icon: "⚡" },
+  { id: "history", icon: "📋" },
+  { id: "progress", icon: "📈" },
+  { id: "program",  icon: "📝" },
+];
+
+function Nav({ tab, setTab }) {
+  const C = useC();
+  const T = useT();
+  const tabLabels = { session: T.session, history: T.history, progress: T.progress, program: T.program };
+  return (
+    <nav style={{
+      position: "fixed", bottom: 0, right: 0,
+      background: C.bg, borderTop: `1px solid ${C.border}`,
+      display: "flex", zIndex: 100, maxWidth: 430, margin: "0 auto",
+      left: "50%", transform: "translateX(-50%)", width: "100%",
+    }}>
+      {TABS.map(t => {
+        const active = tab === t.id;
+        return (
+          <button key={t.id} onClick={() => setTab(t.id)} style={{
+            flex: 1, padding: "10px 4px 12px", background: "none", border: "none",
+            cursor: "pointer", display: "flex", flexDirection: "column",
+            alignItems: "center", gap: 3,
+            color: active ? C.accent : C.muted,
+          }}>
+            <span style={{ fontSize: 17 }}>{t.icon}</span>
+            <span style={{ fontSize: 10, fontFamily: F.heading, fontWeight: 600, letterSpacing: .5 }}>{tabLabels[t.id]}</span>
+            {active && <div style={{ width: 20, height: 2, background: C.accent, borderRadius: 2 }} />}
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+// ─── PROGRAM SETUP ────────────────────────────────────────────────────────────
+// One-time setup: name your program, add training days, add exercises per day.
+
+function ProgramEditor({ prog, onSave, onCancel, highlightAddDay = false }) {
+  const C = useC();
+  const T = useT();
+  const label = useLabel();
+  const [draft, setDraft] = useState(JSON.parse(JSON.stringify(prog)));
+  const [saved, setSaved] = useState(false);
+
+  const addDay = () => setDraft(d => ({ ...d, days: [...d.days, { label: "", exercises: [{ name: "", sets: 3 }] }] }));
+  const removeDay = i => setDraft(d => ({ ...d, days: d.days.filter((_, j) => j !== i) }));
+  const updateDay = (i, val) => setDraft(d => { const days = [...d.days]; days[i] = val; return { ...d, days }; });
+  const addEx = i => updateDay(i, { ...draft.days[i], exercises: [...draft.days[i].exercises, { name: "", sets: 3 }] });
+  const removeEx = (di, ei) => updateDay(di, { ...draft.days[di], exercises: draft.days[di].exercises.filter((_, j) => j !== ei) });
+  const updateEx = (di, ei, val) => {
+    const exs = [...draft.days[di].exercises]; exs[ei] = val;
+    updateDay(di, { ...draft.days[di], exercises: exs });
+  };
+  const moveDay = (from, to) => {
+    if (to < 0 || to >= draft.days.length) return;
+    const days = [...draft.days];
+    const [moved] = days.splice(from, 1);
+    days.splice(to, 0, moved);
+    setDraft(d => ({ ...d, days }));
+  };
+  const moveEx = (di, ei, dir) => {
+    const exs = [...draft.days[di].exercises];
+    const to = ei + dir;
+    if (to < 0 || to >= exs.length) return;
+    [exs[ei], exs[to]] = [exs[to], exs[ei]];
+    updateDay(di, { ...draft.days[di], exercises: exs });
+  };
+
+  const save = () => {
+    const cleaned = {
+      ...draft,
+      days: draft.days.map(d => ({
+        ...d,
+        exercises: d.exercises
+          .map(e => typeof e === "string" ? { name: e, sets: 3 } : e)
+          .filter(e => e.name.trim()),
+      })).filter(d => d.label.trim()),
+    };
+    setSaved(true);
+    setTimeout(() => { onSave(cleaned); }, 600);
+  };
+
+  return (
+    <div style={page}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
+        <button onClick={onCancel} style={{ background: "none", border: "none", color: C.sub, cursor: "pointer", fontSize: 20, padding: 0 }}>←</button>
+        <div style={{ fontSize: 22, fontWeight: 700, color: C.text }}>{draft.name || T.newProgram}</div>
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <span style={label}>{T.programName}</span>
+        <Inp value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} placeholder={T.namePlaceholder} />
+      </div>
+
+      {draft.days.map((day, di) => (
+        <Card key={di} style={{ marginBottom: 12 }}>
+          <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2, flexShrink: 0 }}>
+              <button onClick={() => moveDay(di, di - 1)} disabled={di === 0} style={{ background: "none", border: "none", color: di === 0 ? C.muted : C.sub, cursor: di === 0 ? "default" : "pointer", fontSize: 11, padding: "1px 4px", lineHeight: 1 }}>▲</button>
+              <button onClick={() => moveDay(di, di + 1)} disabled={di === draft.days.length - 1} style={{ background: "none", border: "none", color: di === draft.days.length - 1 ? C.muted : C.sub, cursor: di === draft.days.length - 1 ? "default" : "pointer", fontSize: 11, padding: "1px 4px", lineHeight: 1 }}>▼</button>
+            </div>
+            <Inp value={day.label} onChange={e => updateDay(di, { ...day, label: e.target.value })} placeholder={`Day ${di + 1} name (e.g. Push)`} style={{ flex: 1 }} />
+            <Btn variant="danger" onClick={() => removeDay(di)} style={{ padding: "10px 12px", flexShrink: 0 }}>✕</Btn>
+          </div>
+          <span style={{ ...label, marginBottom: 8 }}>Exercises</span>
+          {day.exercises.map((ex, ei) => {
+            const exObj = typeof ex === "string" ? { name: ex, sets: 3 } : ex;
+            return (
+              <div key={ei} style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 1, flexShrink: 0 }}>
+                  <button onClick={() => moveEx(di, ei, -1)} disabled={ei === 0} style={{ background: "none", border: "none", padding: "1px 5px", lineHeight: 1, color: ei === 0 ? C.muted : C.sub, cursor: ei === 0 ? "default" : "pointer", fontSize: 10 }}>▲</button>
+                  <button onClick={() => moveEx(di, ei, 1)} disabled={ei === day.exercises.length - 1} style={{ background: "none", border: "none", padding: "1px 5px", lineHeight: 1, color: ei === day.exercises.length - 1 ? C.muted : C.sub, cursor: ei === day.exercises.length - 1 ? "default" : "pointer", fontSize: 10 }}>▼</button>
+                </div>
+                <Inp
+                  value={exObj.name}
+                  onChange={e => updateEx(di, ei, { ...exObj, name: e.target.value })}
+                  placeholder={`Exercise ${ei + 1}`}
+                  style={{ flex: 1 }}
+                />
+                {/* Sets count */}
+                <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                  <button onClick={() => updateEx(di, ei, { ...exObj, sets: Math.max(1, exObj.sets - 1) })} style={{
+                    width: 24, height: 24, borderRadius: "50%", background: C.surface,
+                    border: `1px solid ${C.border}`, color: C.sub, cursor: "pointer",
+                    fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center",
+                    fontFamily: F.heading, fontWeight: 700,
+                  }}>−</button>
+                  <div style={{ textAlign: "center", minWidth: 28 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: C.text, fontFamily: F.mono }}>{exObj.sets}</div>
+                    <div style={{ fontSize: 8, color: C.muted, fontWeight: 600, letterSpacing: .5 }}>sets</div>
+                  </div>
+                  <button onClick={() => updateEx(di, ei, { ...exObj, sets: Math.min(20, exObj.sets + 1) })} style={{
+                    width: 24, height: 24, borderRadius: "50%", background: C.surface,
+                    border: `1px solid ${C.border}`, color: C.sub, cursor: "pointer",
+                    fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center",
+                    fontFamily: F.heading, fontWeight: 700,
+                  }}>+</button>
+                </div>
+                {day.exercises.length > 1 && (
+                  <button onClick={() => removeEx(di, ei)} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 18, padding: "0 4px", flexShrink: 0 }}>×</button>
+                )}
+              </div>
+            );
+          })}
+          <Btn variant="ghost" onClick={() => addEx(di)} style={{ marginTop: 4, fontSize: 12 }}>{T.addExercise}</Btn>
+        </Card>
+      ))}
+
+      <Btn
+        variant={highlightAddDay ? "primary" : "ghost"}
+        onClick={addDay}
+        style={{
+          width: "100%", marginBottom: 12, padding: 12,
+          ...(highlightAddDay ? {
+            boxShadow: `0 0 0 3px ${C.accentMid}`,
+            animation: "pulse 1s ease-in-out 3",
+          } : {}),
+        }}
+      >
+        {highlightAddDay ? "👇 Add training day here" : "+ Add training day"}
+      </Btn>
+      <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }`}</style>
+      <Btn variant={saved ? "success" : "primary"} onClick={save} style={{ width: "100%", padding: 13, fontSize: 14 }}>
+        {saved ? T.savedProgram : "Save program"}
+      </Btn>
+    </div>
+  );
+}
+
+function ProgramTab({ data, setData, deepLink, setDeepLink }) {
+  const C = useC();
+  const T = useT();
+  const [editing, setEditing] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [exportState, setExportState] = useState(null);
+  const [importState, setImportState] = useState(null);
+  const [importText, setImportText] = useState("");
+  const [highlightAddDay, setHighlightAddDay] = useState(false);
+
+  const [importError, setImportError] = useState(false);
+
+  // Deep link: open active program editor and highlight Add day button
+  useEffect(() => {
+    if (deepLink === "addDay") {
+      const activeProg = data.programs.find(p => p.id === data.activeProgId);
+      if (activeProg) {
+        setEditing(JSON.parse(JSON.stringify(activeProg)));
+        setHighlightAddDay(true);
+        setTimeout(() => setHighlightAddDay(false), 3000);
+      }
+      setDeepLink(null);
+    }
+  }, [deepLink]);
+
+  const activeProg = data.programs.find(p => p.id === data.activeProgId);
+
+  const createNew = () => setEditing({ id: Date.now().toString(), name: "", days: [] });
+
+  const saveProgram = (prog) => {
+    const exists = data.programs.find(p => p.id === prog.id);
+    const programs = exists
+      ? data.programs.map(p => p.id === prog.id ? prog : p)
+      : [...data.programs, prog];
+    const updated = { ...data, programs, activeProgId: data.activeProgId || prog.id };
+    setData(updated); persist(updated);
+    setEditing(null);
+  };
+
+  const deleteProgram = (id) => {
+    const programs = data.programs.filter(p => p.id !== id);
+    const activeProgId = data.activeProgId === id ? (programs[0]?.id || null) : data.activeProgId;
+    const updated = { ...data, programs, activeProgId };
+    setData(updated); persist(updated);
+    setConfirmDelete(null);
+  };
+
+  const setActive = (id) => {
+    const updated = { ...data, activeProgId: id };
+    setData(updated); persist(updated);
+  };
+
+  const handleImport = () => {
+    try {
+      const parsed = JSON.parse(importText);
+      if (!parsed.ironlogProgram || !parsed.days) throw new Error("Invalid");
+      const newProg = {
+        id: Date.now().toString(),
+        name: parsed.name || "Imported Program",
+        days: parsed.days,
+      };
+      const updated = { ...data, programs: [...data.programs, newProg] };
+      setData(updated); persist(updated);
+      setImportState("success");
+      setImportError(false);
+      setImportText("");
+      setTimeout(() => setImportState(null), 2500);
+    } catch {
+      setImportError(true);
+    }
+  };
+
+  if (editing) {
+    return <ProgramEditor prog={editing} onSave={saveProgram} onCancel={() => setEditing(null)} highlightAddDay={highlightAddDay} />;
+  }
+
+  return (
+    <div style={page}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 24 }}>
+        <div>
+          <div style={{ fontSize: 11, color: C.sub, letterSpacing: 2, fontWeight: 600, marginBottom: 4 }}>{T.myPrograms}</div>
+          <div style={{ fontSize: 26, fontWeight: 700, color: C.text }}>{T.programs}</div>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Btn variant="ghost" onClick={() => { setImportState("input"); setImportText(""); }} style={{ padding: "8px 12px", fontSize: 12 }}>
+            {T.importBtn}
+          </Btn>
+          <Btn onClick={createNew} style={{ padding: "8px 14px", fontSize: 13 }}>{T.newBtn}</Btn>
+        </div>
+      </div>
+
+      {/* Import panel */}
+      {importState === "input" && (
+        <Card style={{ marginBottom: 16, borderColor: C.accentMid }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: C.text, marginBottom: 4 }}>{T.importTitle}</div>
+          <div style={{ fontSize: 12, color: C.sub, marginBottom: 12, lineHeight: 1.6 }}>
+            {T.importSub}
+          </div>
+          <textarea
+            value={importText}
+            onChange={e => { setImportText(e.target.value); setImportError(false); }}
+            placeholder={T.importPlaceholder}
+            rows={5}
+            style={{
+              width: "100%", boxSizing: "border-box",
+              background: C.surface, border: `1px solid ${importError ? "#f87171" : C.border}`,
+              borderRadius: 8, color: C.text, padding: "10px 12px",
+              fontSize: 11, outline: "none", fontFamily: F.mono,
+              resize: "none", lineHeight: 1.5,
+            }}
+          />
+          {importError && (
+            <div style={{ color: "#f87171", fontSize: 11, marginTop: 6, fontWeight: 600 }}>
+              {T.importError}
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+            <Btn onClick={handleImport} style={{ fontSize: 12, padding: "7px 14px" }}>{T.addProgram}</Btn>
+            <Btn variant="ghost" onClick={() => { setImportState(null); setImportText(""); }} style={{ fontSize: 12, padding: "7px 14px" }}>{T.cancel}</Btn>
+          </div>
+        </Card>
+      )}
+
+      {importState === "success" && (
+        <Card style={{ marginBottom: 16, background: C.greenDim, borderColor: C.green }}>
+          <div style={{ color: C.green, fontWeight: 700, fontSize: 13 }}>✓ {T.importSuccess}</div>
+        </Card>
+      )}
+
+      {/* Export panel for a specific program */}
+      {exportState && exportState !== "copied" && (
+        <Card style={{ marginBottom: 16 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: C.text, marginBottom: 4 }}>Share "{exportState.name}"</div>
+          <div style={{ fontSize: 12, color: C.sub, marginBottom: 10, lineHeight: 1.6 }}>
+            {T.shareSub}
+          </div>
+          <textarea
+            readOnly
+            value={JSON.stringify({ ironlogProgram: true, ...exportState })}
+            onFocus={e => e.target.select()}
+            rows={5}
+            style={{
+              width: "100%", boxSizing: "border-box",
+              background: C.surface, border: `1px solid ${C.border}`,
+              borderRadius: 8, color: C.text, padding: "10px 12px",
+              fontSize: 11, outline: "none", fontFamily: F.mono,
+              resize: "none", lineHeight: 1.5,
+            }}
+          />
+          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+            <Btn onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(JSON.stringify({ ironlogProgram: true, ...exportState }));
+                setExportState("copied");
+                setTimeout(() => setExportState(null), 2000);
+              } catch { /* already showing text */ }
+            }} style={{ fontSize: 12, padding: "7px 14px" }}>{T.copyCode}</Btn>
+            <Btn variant="ghost" onClick={() => setExportState(null)} style={{ fontSize: 12, padding: "7px 14px" }}>{T.close}</Btn>
+          </div>
+        </Card>
+      )}
+
+      {exportState === "copied" && (
+        <Card style={{ marginBottom: 16, background: C.greenDim, borderColor: C.green }}>
+          <div style={{ color: C.green, fontWeight: 700, fontSize: 13 }}>✓ Copied — {T.copied}</div>
+        </Card>
+      )}
+
+      {!data.programs.length && (
+        <Card style={{ background: C.accentDim, borderColor: C.accentMid }}>
+          <div style={{ color: C.accent, fontWeight: 600, fontSize: 13, marginBottom: 4 }}>{T.noPrograms}</div>
+          <div style={{ color: C.sub, fontSize: 12, lineHeight: 1.6 }}>
+            {T.noProgramsSub}
+          </div>
+        </Card>
+      )}
+
+      {data.programs.map(prog => {
+        const isActive = prog.id === data.activeProgId;
+        return (
+          <Card key={prog.id} highlight={isActive}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                  <div style={{ fontWeight: 700, fontSize: 17, color: C.text }}>{prog.name || "Unnamed"}</div>
+                  {isActive && (
+                    <div style={{
+                      background: C.accentDim, border: `1px solid ${C.accentMid}`,
+                      borderRadius: 20, padding: "2px 8px",
+                      fontSize: 10, fontWeight: 700, color: C.accent, letterSpacing: .5,
+                    }}>{T.active}</div>
+                  )}
+                </div>
+                <div style={{ color: C.sub, fontSize: 12 }}>
+                  {prog.days.map(d => d.label).join(" · ") || "No days yet"}
+                </div>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {!isActive && (
+                <Btn variant="primary" onClick={() => setActive(prog.id)} style={{ fontSize: 12, padding: "7px 14px" }}>
+                  {T.setActive}
+                </Btn>
+              )}
+              <Btn variant="ghost" onClick={() => setEditing(prog)} style={{ fontSize: 12, padding: "7px 14px" }}>{T.edit}</Btn>
+              <Btn variant="ghost" onClick={() => setExportState(prog)} style={{ fontSize: 12, padding: "7px 14px" }}>{T.share}</Btn>
+              <Btn variant="danger" onClick={() => setConfirmDelete(prog.id)} style={{ fontSize: 12, padding: "7px 14px" }}>{T.deleteBtn}</Btn>
+            </div>
+            {confirmDelete === prog.id && (
+              <div style={{
+                marginTop: 12, padding: 12, borderRadius: 8,
+                background: "#f8717115", border: "1px solid #f8717130",
+              }}>
+                <div style={{ color: "#f87171", fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
+                  Delete "{prog.name}"? {T.deleteConfirm}
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <Btn variant="danger" onClick={() => deleteProgram(prog.id)} style={{ fontSize: 12, padding: "7px 14px" }}>{T.yesDelete}</Btn>
+                  <Btn variant="ghost" onClick={() => setConfirmDelete(null)} style={{ fontSize: 12, padding: "7px 14px" }}>{T.cancel}</Btn>
+                </div>
+              </div>
+            )}
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── SESSION TAB ──────────────────────────────────────────────────────────────
+// Pick a day → exercises pre-loaded from program → just fill weight + reps per set.
+
+function SetRow({ set, idx, prev, unit, onChange, onDelete, canDelete }) {
+  const C = useC();
+  const T = useT();
+  const RIR_OPTIONS = ["Failure", "RIR 1", "RIR 2", "RIR 3", "RIR 4+"];
+  const displayRIR = (opt) => opt === "Failure" ? T.failure : opt;
+  const prevNote = prev?.rir ? (prev.rir === "Failure" ? `💀 ${T.failure}` : prev.rir) : null;
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div style={{
+          width: 22, textAlign: "center", fontSize: 11,
+          color: C.accent, fontWeight: 700, flexShrink: 0,
+        }}>{idx + 1}</div>
+        <div style={{ flex: 1 }}>
+          {prev && (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 8,
+              marginBottom: 6,
+            }}>
+              <span style={{ fontSize: 11, color: C.sub, fontWeight: 600, letterSpacing: .5 }}>{T.last}</span>
+              <span style={{ fontSize: 13, color: C.text, fontWeight: 700, fontFamily: F.mono }}>
+                {prev.weight} × {prev.reps}
+              </span>
+              {prevNote && (
+                <span style={{ fontSize: 10, color: prev.rir === "Failure" ? "#f87171" : C.accent, fontWeight: 600 }}>
+                  {prevNote}
+                </span>
+              )}
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 6 }}>
+            <div style={{ flex: 2, display: "flex", alignItems: "center", position: "relative", minWidth: 0 }}>
+              <input
+                type="number"
+                inputMode="decimal"
+                placeholder="0"
+                min="0"
+                value={set.weight}
+                onChange={e => {
+                  const val = e.target.value;
+                  if (val === "" || parseFloat(val) >= 0) onChange({ ...set, weight: val });
+                }}
+                style={{
+                  width: "100%", background: C.surface, border: `1px solid ${C.border}`,
+                  borderRadius: 7, color: C.text, padding: "9px 10px", fontSize: 14,
+                  outline: "none", fontFamily: F.mono,
+                  paddingRight: unit ? `${unit.length * 9 + 12}px` : "10px",
+                }}
+              />
+              {unit && (
+                <span style={{
+                  position: "absolute", right: 10, fontSize: 11,
+                  fontWeight: 700, color: C.accent, fontFamily: F.heading,
+                  pointerEvents: "none",
+                }}>{unit}</span>
+              )}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", color: C.muted, fontSize: 13, flexShrink: 0 }}>×</div>
+            <input
+              type="number"
+              placeholder={T.reps}
+              value={set.reps}
+              onChange={e => onChange({ ...set, reps: e.target.value })}
+              style={{
+                flex: 1, background: C.surface, border: `1px solid ${C.border}`,
+                borderRadius: 7, color: C.text, padding: "9px 10px", fontSize: 14,
+                outline: "none", fontFamily: F.mono, minWidth: 0,
+              }}
+            />
+          </div>
+        </div>
+        {canDelete && (
+          <button onClick={onDelete} style={{
+            background: "none", border: "none", color: C.muted,
+            cursor: "pointer", fontSize: 18, flexShrink: 0, padding: "0 2px",
+          }}>×</button>
+        )}
+      </div>
+
+      {/* RIR / Failure pill selector */}
+      <div style={{ display: "flex", gap: 5, marginTop: 6, marginLeft: 30, flexWrap: "wrap" }}>
+        {RIR_OPTIONS.map(opt => {
+          const selected = set.rir === opt;
+          const isFailure = opt === "Failure";
+          return (
+            <button
+              key={opt}
+              onClick={() => onChange({ ...set, rir: selected ? "" : opt })}
+              style={{
+                padding: "3px 9px", borderRadius: 20, fontSize: 10, fontWeight: 600,
+                cursor: "pointer", fontFamily: F.heading, letterSpacing: .3,
+                border: `1px solid ${selected ? (isFailure ? "#f87171" : C.accent) : C.border}`,
+                background: selected ? (isFailure ? "#f8717120" : C.accentDim) : "transparent",
+                color: selected ? (isFailure ? "#f87171" : C.accent) : C.muted,
+                transition: "all .12s",
+              }}
+            >
+              {displayRIR(opt)}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ExerciseBlock({ ex, prevSets, allTimeBest, onChange }) {
+  const C = useC();
+  const T = useT();
+  const UNITS = ["lbs", "kg", "plate"];
+
+  const unit = ex.unit || null;
+  const setUnit = (u) => onChange({ ...ex, unit: u });
+
+  const addSet = () => onChange({ ...ex, sets: [...ex.sets, { weight: "", reps: "" }] });
+  const filled = ex.sets.filter(s => s.weight || s.reps).length;
+
+  const parseW = (w) => parseFloat(String(w).replace(/[^\d.]/g, "")) || 0;
+  const sessionBest = Math.max(...ex.sets.map(s => parseW(s.weight)));
+  const isPR = sessionBest > 0 && allTimeBest > 0 && sessionBest > allTimeBest;
+  const isFirstEver = sessionBest > 0 && allTimeBest === 0;
+
+  return (
+    <Card>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+        <div style={{ fontWeight: 700, fontSize: 15, color: C.text }}>{ex.name}</div>
+        <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
+          {(isPR || isFirstEver) && (
+            <div style={{
+              background: "#ffd60020", border: "1px solid #ffd60060",
+              color: "#ffd600", fontSize: 10, fontWeight: 700,
+              padding: "3px 8px", borderRadius: 20, letterSpacing: .5,
+            }}>
+              🏆 {isFirstEver ? T.firstLog : T.newPR}
+            </div>
+          )}
+          {filled > 0 && !isPR && !isFirstEver && (
+            <div style={{
+              background: C.greenDim, color: C.green, fontSize: 10,
+              fontWeight: 700, padding: "3px 8px", borderRadius: 20, letterSpacing: .5,
+            }}>
+              {filled} {filled > 1 ? T.setsLogged : T.setLogged}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Unit selector — shown until one is picked, then shows small badge */}
+      {!unit ? (
+        <div style={{ display: "flex", gap: 6, marginBottom: 12, alignItems: "center" }}>
+          <span style={{ fontSize: 10, color: C.muted, fontWeight: 600, fontFamily: F.heading }}>Unit:</span>
+          {UNITS.map(u => (
+            <button key={u} onClick={() => setUnit(u)} style={{
+              padding: "4px 12px", borderRadius: 20, fontSize: 11, fontWeight: 700,
+              cursor: "pointer", fontFamily: F.heading,
+              border: `1px solid ${C.border}`,
+              background: C.surface, color: C.sub,
+              transition: "all .12s",
+            }}>{u}</button>
+          ))}
+        </div>
+      ) : (
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12 }}>
+          <div style={{
+            background: C.accentDim, border: `1px solid ${C.accentMid}`,
+            borderRadius: 20, padding: "3px 10px",
+            fontSize: 10, fontWeight: 700, color: C.accent,
+          }}>{unit}</div>
+          <button onClick={() => setUnit(null)} style={{
+            background: "none", border: "none", color: C.muted,
+            fontSize: 10, cursor: "pointer", fontFamily: F.heading,
+            fontWeight: 600, padding: 0,
+          }}>{T.change}</button>
+        </div>
+      )}
+
+      {ex.sets.map((s, i) => (
+        <SetRow
+          key={i} set={s} idx={i}
+          prev={prevSets?.[i] || null}
+          unit={unit}
+          canDelete={ex.sets.length > 1}
+          onChange={val => {
+            const sets = [...ex.sets]; sets[i] = val;
+            onChange({ ...ex, sets });
+          }}
+          onDelete={() => onChange({ ...ex, sets: ex.sets.filter((_, j) => j !== i) })}
+        />
+      ))}
+      <Btn variant="ghost" onClick={addSet} style={{ marginTop: 4, fontSize: 12 }}>{T.addSet}</Btn>
+    </Card>
+  );
+}
+
+const DRAFT_KEY = "ironlog_draft";
+
+function saveDraft(dayIdx, exercises, notes, progId) {
+  try {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ dayIdx, exercises, notes, progId, ts: Date.now() }));
+    return true;
+  } catch { return false; }
+}
+function loadDraft() {
+  try { const r = localStorage.getItem(DRAFT_KEY); return r ? JSON.parse(r) : null; } catch { return null; }
+}
+function clearDraft() {
+  try { localStorage.removeItem(DRAFT_KEY); } catch {}
+}
+
+function SessionTab({ data, setData, setTab, setDeepLink }) {
+  const C = useC();
+  const T = useT();
+  const label = useLabel();
+  const [selectedDay, setSelectedDay] = useState(null);
+  const [exercises, setExercises] = useState([]);
+  const [notes, setNotes] = useState("");
+  const [saved, setSaved] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const skipSave = useRef(false);
+  const [cachedDraft, setCachedDraft] = useState(null);
+
+  const prog = data.programs.find(p => p.id === data.activeProgId) || null;
+
+  // Re-read draft from localStorage on mount — handles returning from another tab
+  useEffect(() => { setCachedDraft(loadDraft()); }, []);
+
+  // Validate — clear if dayIdx out of bounds (program was edited since draft was saved)
+  const draftValid = cachedDraft && prog &&
+    cachedDraft.progId === prog.id &&
+    cachedDraft.dayIdx < prog.days.length;
+
+  useEffect(() => {
+    if (cachedDraft && !draftValid) { clearDraft(); setCachedDraft(null); }
+  }, [draftValid]);
+
+  const activeDraft = draftValid ? cachedDraft : null;
+
+  useEffect(() => {
+    if (skipSave.current) { skipSave.current = false; return; }
+    if (selectedDay !== null && exercises.length && prog) {
+      const ok = saveDraft(selectedDay, exercises, notes, prog.id);
+      setSaveFailed(!ok);
+    }
+  }, [exercises, notes, selectedDay]);
+
+  const restoreDraft = () => {
+    if (!activeDraft || !prog) return;
+    skipSave.current = true;
+    setSelectedDay(activeDraft.dayIdx);
+    setExercises(activeDraft.exercises);
+    setNotes(activeDraft.notes || "");
+    setSaved(false);
+    saveDraft(activeDraft.dayIdx, activeDraft.exercises, activeDraft.notes || "", prog.id);
+  };
+
+  const discardDraft = () => {
+    clearDraft();
+    setCachedDraft(null);
+    setConfirmDiscard(false);
+  };
+
+  const prevLog = selectedDay != null
+    ? [...data.logs]
+        .filter(l => l.progId === data.activeProgId)
+        .find(l => l.dayLabel === prog?.days[selectedDay]?.label)
+    : null;
+
+  const selectDay = (di) => {
+    setSelectedDay(di);
+    const day = prog.days[di];
+    setExercises(day.exercises.map(ex => {
+      const exObj = typeof ex === "string" ? { name: ex, sets: 3 } : ex;
+      return {
+        name: exObj.name,
+        unit: null,
+        sets: Array.from({ length: exObj.sets }, () => ({ weight: "", reps: "" })),
+      };
+    }));
+    setNotes("");
+    setSaved(false);
+    clearDraft();
+    setCachedDraft(null);
+  };
+
+  const saveSession = () => {
+    const filled = exercises.map(e => ({ ...e, sets: e.sets.filter(s => s.weight || s.reps) })).filter(e => e.sets.length);
+    if (!filled.length) return;
+    // Count PRs for summary screen
+    const parseW = (w) => Math.max(0, parseFloat(String(w).replace(/[^\d.]/g, "")) || 0);
+    const dayLabel = prog.days[selectedDay].label;
+    const prCount = filled.filter(ex => {
+      const sessionBest = Math.max(...ex.sets.map(s => parseW(s.weight)));
+      const best = Math.max(0, ...data.logs
+        .filter(l => l.progId === data.activeProgId && l.dayLabel === dayLabel)
+        .flatMap(l => l.exercises.filter(e => e.name === ex.name).flatMap(e => e.sets.map(s => parseW(s.weight))))
+      );
+      return sessionBest > 0 && sessionBest > best;
+    }).length;
+    const totalSets = filled.reduce((sum, e) => sum + e.sets.length, 0);
+    const log = {
+      id: Date.now(),
+      date: new Date().toISOString(),
+      progId: data.activeProgId,
+      dayLabel: prog.days[selectedDay].label,
+      exercises: filled,
+      notes: notes.trim(),
+      summary: { exercises: filled.length, sets: totalSets, prs: prCount },
+    };
+    const updated = { ...data, logs: [log, ...data.logs] };
+    setData(updated); persist(updated);
+    clearDraft();
+    setSaved({ prs: prCount, sets: totalSets, exCount: filled.length });
+  };
+
+  if (!prog) {
+    return (
+      <div style={{ ...page, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "80vh" }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>📝</div>
+          <div style={{ fontWeight: 700, fontSize: 18, color: C.text, marginBottom: 8 }}>No program set up</div>
+          <div style={{ color: C.sub, fontSize: 14, lineHeight: 1.6 }}>
+            {T.noProgramSub}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (saved) {
+    const hasPRs = saved.prs > 0;
+    return (
+      <div style={{ ...page, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "80vh" }}>
+        <div style={{ textAlign: "center", maxWidth: 300 }}>
+          <div style={{ fontSize: 56, marginBottom: 16 }}>{hasPRs ? "🏆" : "✅"}</div>
+          <div style={{ fontWeight: 900, fontSize: 26, color: C.text, letterSpacing: -1, marginBottom: 6 }}>
+            {hasPRs ? T.sessionDone : T.sessionSaved}
+          </div>
+          {hasPRs && (
+            <div style={{
+              background: "#ffd60018", border: "1px solid #ffd60050",
+              borderRadius: 12, padding: "10px 20px", marginBottom: 16,
+              color: "#ffd600", fontWeight: 700, fontSize: 14,
+            }}>
+              🏆 {saved.prs} {T.newPRToday}
+            </div>
+          )}
+          <div style={{ display: "flex", justifyContent: "center", gap: 24, marginBottom: 28 }}>
+            <div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: C.text }}>{saved.exCount}</div>
+              <div style={{ fontSize: 10, color: C.sub, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase" }}>{T.exercises}</div>
+            </div>
+            <div style={{ width: 1, background: C.border }} />
+            <div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: C.text }}>{saved.sets}</div>
+              <div style={{ fontSize: 10, color: C.sub, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase" }}>{T.sets}</div>
+            </div>
+            <div style={{ width: 1, background: C.border }} />
+            <div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: hasPRs ? "#ffd600" : C.text }}>{saved.prs}</div>
+              <div style={{ fontSize: 10, color: C.sub, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase" }}>{T.prs}</div>
+            </div>
+          </div>
+          <Btn onClick={() => { setSelectedDay(null); setExercises([]); setSaved(false); }}>
+            Done
+          </Btn>
+        </div>
+      </div>
+    );
+  }
+
+  if (selectedDay === null) {
+    return (
+      <div style={page}>
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 11, color: C.sub, letterSpacing: 2, fontWeight: 600, marginBottom: 4 }}>
+            {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }).toUpperCase()}
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: C.text, fontFamily: F.heading }}>{T.whatTraining}</div>
+        </div>
+
+        {activeDraft && prog.days[activeDraft.dayIdx] && (
+          <Card style={{ background: C.accentDim, borderColor: C.accentMid, marginBottom: 16 }}>
+            {!confirmDiscard ? (
+              <>
+                <div style={{ color: C.accent, fontWeight: 700, fontSize: 13, marginBottom: 6 }}>
+                  🔄 {T.unfinished} {prog.days[activeDraft.dayIdx].label}
+                </div>
+                <div style={{ color: C.sub, fontSize: 12, marginBottom: 12 }}>
+                  {T.pickUp}
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <Btn onClick={restoreDraft} style={{ fontSize: 12, padding: "7px 14px" }}>{T.resumeSession}</Btn>
+                  <Btn variant="ghost" onClick={() => setConfirmDiscard(true)} style={{ fontSize: 12, padding: "7px 14px" }}>{T.discard}</Btn>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ color: "#f87171", fontWeight: 700, fontSize: 13, marginBottom: 6 }}>
+                  {T.discardTitle}
+                </div>
+                <div style={{ color: C.sub, fontSize: 12, marginBottom: 12 }}>
+                  {T.discardBody} {prog.days[activeDraft.dayIdx].label} {T.discardBody2}
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <Btn variant="danger" onClick={discardDraft} style={{ fontSize: 12, padding: "7px 14px" }}>{T.yesDiscard}</Btn>
+                  <Btn variant="ghost" onClick={() => setConfirmDiscard(false)} style={{ fontSize: 12, padding: "7px 14px" }}>{T.keepIt}</Btn>
+                </div>
+              </>
+            )}
+          </Card>
+        )}
+
+        {prog.days.map((day, di) => {
+          const lastLogged = data.logs.find(l => l.progId === data.activeProgId && l.dayLabel === day.label);
+          return (
+            <Card key={di} style={{ cursor: "pointer" }} highlight={false}>
+              <button onClick={() => selectDay(di)} style={{
+                width: "100%", background: "none", border: "none",
+                padding: 0, cursor: "pointer", textAlign: "left",
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 17, color: C.text, marginBottom: 6 }}>{day.label}</div>
+                    <div style={{ color: C.sub, fontSize: 12 }}>
+                      {day.exercises.map(e => typeof e === "string" ? e : e.name).join(" · ")}
+                    </div>
+                  </div>
+                  <div style={{
+                    background: C.accent, color: "#fff", borderRadius: 8,
+                    padding: "6px 12px", fontSize: 12, fontWeight: 600, flexShrink: 0, marginLeft: 12,
+                  }}>{T.startArrow}</div>
+                </div>
+                {lastLogged && (
+                  <div style={{ marginTop: 10, fontSize: 11, color: C.muted }}>
+                    Last: {new Date(lastLogged.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  </div>
+                )}
+              </button>
+            </Card>
+          );
+        })}
+
+        <button onClick={() => { setDeepLink("addDay"); setTab("program"); }} style={{
+          width: "100%", background: "none",
+          border: `1px dashed ${C.border}`,
+          borderRadius: 12, padding: "14px 16px",
+          cursor: "pointer", textAlign: "left",
+          display: "flex", alignItems: "center", gap: 12,
+        }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: "50%",
+            background: C.accentDim, border: `1px solid ${C.accentMid}`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            flexShrink: 0,
+          }}>
+            <span style={{ color: C.accent, fontSize: 18, fontWeight: 300, lineHeight: 1 }}>+</span>
+          </div>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 14, color: C.accent }}>{T.addTrainingDay}</div>
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{T.addTrainingDaySub}</div>
+          </div>
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={page}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+        <button onClick={() => setSelectedDay(null)} style={{
+          background: "none", border: "none", color: C.sub, cursor: "pointer", fontSize: 20, padding: 0,
+        }}>←</button>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 11, color: C.sub, letterSpacing: 1.5, fontWeight: 600 }}>TODAY'S SESSION</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: C.text }}>{prog.days[selectedDay].label}</div>
+        </div>
+        <div style={{ fontSize: 10, fontWeight: 600, display: "flex", alignItems: "center", gap: 4,
+          color: saveFailed ? "#f87171" : C.green,
+        }}>
+          <div style={{ width: 6, height: 6, borderRadius: "50%", background: saveFailed ? "#f87171" : C.green }} />
+          {saveFailed ? T.saveFailed : T.autoSaving}
+        </div>
+      </div>
+
+      {prevLog && (
+        <Card style={{ background: C.accentDim, borderColor: C.accentMid, marginBottom: 16 }}>
+          <div style={{ color: C.accent, fontSize: 12, fontWeight: 600 }}>
+            📅 Last session: {new Date(prevLog.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })} — {T.prevShown.replace('— ','')}
+          </div>
+        </Card>
+      )}
+
+      {(() => {
+        // Pre-compute allTimeBest for all exercises once — not per keystroke
+        const parseW = (w) => Math.max(0, parseFloat(String(w).replace(/[^\d.]/g, "")) || 0);
+        const progLogs = data.logs.filter(l => l.progId === data.activeProgId);
+        const bestByName = {};
+        progLogs.forEach(l => l.exercises.forEach(e => {
+          const key = `${e.name}__${l.dayLabel}`;
+          const best = Math.max(0, ...e.sets.map(s => parseW(s.weight)));
+          bestByName[key] = Math.max(bestByName[key] || 0, best);
+        }));
+
+        return exercises.map((ex, i) => {
+          const prevEx = prevLog?.exercises.find(e => e.name === ex.name);
+          const dayLabel = prog.days[selectedDay]?.label || "";
+          const allTimeBest = bestByName[`${ex.name}__${dayLabel}`] || 0;
+          return (
+            <ExerciseBlock
+              key={i}
+              ex={ex}
+              prevSets={prevEx?.sets || null}
+              allTimeBest={allTimeBest}
+              onChange={val => {
+                const copy = [...exercises]; copy[i] = val; setExercises(copy);
+              }}
+            />
+          );
+        });
+      })()}
+
+      <div style={{ marginTop: 16, marginBottom: 12 }}>
+        <span style={label}>Session notes</span>
+        <textarea
+          value={notes}
+          onChange={e => setNotes(e.target.value)}
+          placeholder={T.notesPlaceholder}
+          rows={3}
+          style={{
+            width: "100%", boxSizing: "border-box",
+            background: C.surface, border: `1px solid ${C.border}`,
+            borderRadius: 8, color: C.text, padding: "10px 12px",
+            fontSize: 13, outline: "none", fontFamily: F.heading,
+            resize: "none", lineHeight: 1.6,
+          }}
+        />
+      </div>
+
+      <Btn onClick={saveSession} style={{ width: "100%", padding: 14, fontSize: 15 }}>
+        Save session
+      </Btn>
+    </div>
+  );
+}
+
+// ─── HISTORY TAB ──────────────────────────────────────────────────────────────
+
+function HistoryTab({ data, setData }) {
+  const C = useC();
+  const T = useT();
+  const label = useLabel();
+  const divider = useDivider();
+  const [open, setOpen] = useState(null);
+  const [editing, setEditing] = useState(null); // log id being edited
+  const [editDraft, setEditDraft] = useState(null); // draft copy of the log
+
+  const activeProg = data.programs.find(p => p.id === data.activeProgId);
+  const logs = data.logs.filter(l => l.progId === data.activeProgId);
+
+  const startEdit = (log) => {
+    setEditing(log.id);
+    setEditDraft(JSON.parse(JSON.stringify(log)));
+  };
+
+  const saveEdit = () => {
+    const updated = { ...data, logs: data.logs.map(l => l.id === editing ? editDraft : l) };
+    setData(updated); persist(updated);
+    setEditing(null); setEditDraft(null);
+  };
+
+  const cancelEdit = () => { setEditing(null); setEditDraft(null); };
+
+  const RIR_OPTIONS = [T.failure, "RIR 1", "RIR 2", "RIR 3", "RIR 4+"];
+
+  // ── Edit view ──
+  if (editing && editDraft) {
+    return (
+      <div style={page}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+          <button onClick={cancelEdit} style={{ background: "none", border: "none", color: C.sub, cursor: "pointer", fontSize: 20, padding: 0 }}>←</button>
+          <div>
+            <div style={{ fontSize: 11, color: C.sub, letterSpacing: 1.5, fontWeight: 600 }}>{T.editingSession}</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: C.text }}>{editDraft.dayLabel}</div>
+          </div>
+        </div>
+
+        {editDraft.exercises.map((ex, ei) => (
+          <Card key={ei}>
+            <div style={{ fontWeight: 700, fontSize: 15, color: C.text, marginBottom: 12 }}>{ex.name}</div>
+            {ex.sets.map((s, si) => (
+              <div key={si} style={{ marginBottom: 12 }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <div style={{ width: 22, textAlign: "center", fontSize: 11, color: C.accent, fontWeight: 700, flexShrink: 0 }}>{si + 1}</div>
+                  <input
+                    type="number" placeholder="lb" value={s.weight}
+                    onChange={e => {
+                      const exs = JSON.parse(JSON.stringify(editDraft.exercises));
+                      exs[ei].sets[si].weight = e.target.value;
+                      setEditDraft({ ...editDraft, exercises: exs });
+                    }}
+                    style={{ flex: 1, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 7, color: C.text, padding: "9px 10px", fontSize: 14, outline: "none", fontFamily: F.mono, minWidth: 0 }}
+                  />
+                  <div style={{ color: C.muted, fontSize: 13, flexShrink: 0 }}>×</div>
+                  <input
+                    type="number" placeholder="reps" value={s.reps}
+                    onChange={e => {
+                      const exs = JSON.parse(JSON.stringify(editDraft.exercises));
+                      exs[ei].sets[si].reps = e.target.value;
+                      setEditDraft({ ...editDraft, exercises: exs });
+                    }}
+                    style={{ flex: 1, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 7, color: C.text, padding: "9px 10px", fontSize: 14, outline: "none", fontFamily: F.mono, minWidth: 0 }}
+                  />
+                  {ex.sets.length > 1 && (
+                    <button onClick={() => {
+                      const exs = JSON.parse(JSON.stringify(editDraft.exercises));
+                      exs[ei].sets = exs[ei].sets.filter((_, j) => j !== si);
+                      setEditDraft({ ...editDraft, exercises: exs });
+                    }} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 18, flexShrink: 0, padding: "0 2px" }}>×</button>
+                  )}
+                </div>
+                {/* RIR pills */}
+                <div style={{ display: "flex", gap: 5, marginTop: 6, marginLeft: 30, flexWrap: "wrap" }}>
+                  {RIR_OPTIONS.map(opt => {
+                    const selected = s.rir === opt;
+                    const isFailure = opt === "Failure";
+                    return (
+                      <button key={opt} onClick={() => {
+                        const exs = JSON.parse(JSON.stringify(editDraft.exercises));
+                        exs[ei].sets[si].rir = selected ? "" : opt;
+                        setEditDraft({ ...editDraft, exercises: exs });
+                      }} style={{
+                        padding: "3px 9px", borderRadius: 20, fontSize: 10, fontWeight: 600,
+                        cursor: "pointer", fontFamily: F.heading, letterSpacing: .3,
+                        border: `1px solid ${selected ? (isFailure ? "#f87171" : C.accent) : C.border}`,
+                        background: selected ? (isFailure ? "#f8717120" : C.accentDim) : "transparent",
+                        color: selected ? (isFailure ? "#f87171" : C.accent) : C.muted,
+                      }}>{opt}</button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+            <Btn variant="ghost" onClick={() => {
+              const exs = JSON.parse(JSON.stringify(editDraft.exercises));
+              exs[ei].sets.push({ weight: "", reps: "", rir: "" });
+              setEditDraft({ ...editDraft, exercises: exs });
+            }} style={{ fontSize: 12, marginTop: 4 }}>{T.addSet}</Btn>
+          </Card>
+        ))}
+
+        <div style={{ marginTop: 8, marginBottom: 12 }}>
+          <span style={label}>Session notes</span>
+          <textarea
+            value={editDraft.notes || ""}
+            onChange={e => setEditDraft({ ...editDraft, notes: e.target.value })}
+            placeholder={T.notesPlaceholder}
+            rows={3}
+            style={{
+              width: "100%", boxSizing: "border-box",
+              background: C.surface, border: `1px solid ${C.border}`,
+              borderRadius: 8, color: C.text, padding: "10px 12px",
+              fontSize: 13, outline: "none", fontFamily: F.heading,
+              resize: "none", lineHeight: 1.6,
+            }}
+          />
+        </div>
+
+        <Btn onClick={saveEdit} style={{ width: "100%", padding: 13, fontSize: 14 }}>{T.saveChanges}</Btn>
+      </div>
+    );
+  }
+
+  // ── List view ──
+  if (!logs.length) {
+    return (
+      <div style={{ ...page, display: "flex", alignItems: "center", justifyContent: "center", minHeight: "80vh" }}>
+        <div style={{ textAlign: "center", color: C.sub }}>
+          <div style={{ fontSize: 36, marginBottom: 12 }}>📋</div>
+          <div style={{ fontWeight: 600, fontSize: 16, color: C.text }}>No sessions yet</div>
+          <div style={{ fontSize: 13, marginTop: 6 }}>
+            {activeProg ? `${T.noSessionsFor} ${activeProg.name}` : T.sessionsPlaceholder}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={page}>
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ fontSize: 11, color: C.sub, letterSpacing: 2, fontWeight: 600, marginBottom: 4 }}>
+          {activeProg ? activeProg.name.toUpperCase() : T.allTime}
+        </div>
+        <div style={{ fontSize: 26, fontWeight: 700, color: C.text }}>History</div>
+      </div>
+
+      {logs.map(log => {
+        const isOpen = open === log.id;
+        return (
+          <Card key={log.id} highlight={isOpen}>
+            <button onClick={() => setOpen(isOpen ? null : log.id)} style={{
+              width: "100%", background: "none", border: "none",
+              padding: 0, cursor: "pointer", textAlign: "left",
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+            }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 16, color: C.text }}>{log.dayLabel}</div>
+                <div style={{ color: C.sub, fontSize: 12, marginTop: 3 }}>
+                  {new Date(log.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+                </div>
+              </div>
+              <div style={{ color: C.muted, fontSize: 18 }}>{isOpen ? "▲" : "▼"}</div>
+            </button>
+
+            {isOpen && (
+              <>
+                <div style={divider} />
+                {log.notes && (
+                  <div style={{
+                    background: C.surface, borderRadius: 8, padding: "10px 12px",
+                    marginBottom: 14, borderLeft: `3px solid ${C.accent}`,
+                  }}>
+                    <div style={{ fontSize: 10, color: C.sub, fontWeight: 600, letterSpacing: 1.5, marginBottom: 4 }}>{T.notes}</div>
+                    <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.6 }}>{log.notes}</div>
+                  </div>
+                )}
+                {log.exercises.map((ex, i) => (
+                  <div key={i} style={{ marginBottom: 14 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: C.text, marginBottom: 6 }}>{ex.name}</div>
+                    {ex.sets.map((s, j) => (
+                      <div key={j} style={{
+                        display: "flex", gap: 8, alignItems: "center",
+                        marginBottom: 4, paddingLeft: 8,
+                        borderLeft: `2px solid ${C.border}`,
+                      }}>
+                        <span style={{ fontSize: 11, color: C.muted, width: 16 }}>{j + 1}</span>
+                        <span style={{ fontSize: 13, color: C.text, fontFamily: F.mono }}>
+                          {s.weight} × {s.reps} reps
+                        </span>
+                        {s.rir && (
+                          <span style={{
+                            fontSize: 10, fontWeight: 600, fontFamily: F.heading,
+                            color: s.rir === "Failure" ? "#f87171" : C.accent,
+                            background: s.rir === "Failure" ? "#f8717115" : C.accentDim,
+                            border: `1px solid ${s.rir === "Failure" ? "#f8717130" : C.accentMid}`,
+                            borderRadius: 20, padding: "1px 7px", marginLeft: "auto",
+                          }}>
+                            {s.rir === "Failure" ? `💀 ${T.failure}` : s.rir}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+                <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                  <Btn variant="ghost" onClick={() => startEdit(log)} style={{ fontSize: 12, padding: "7px 12px" }}>
+                    {T.editSession}
+                  </Btn>
+                  <Btn variant="danger" onClick={() => {
+                    const updated = { ...data, logs: data.logs.filter(l => l.id !== log.id) };
+                    setData(updated); persist(updated); setOpen(null);
+                  }} style={{ fontSize: 12, padding: "7px 12px" }}>
+                    Delete
+                  </Btn>
+                </div>
+              </>
+            )}
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── PROGRESS TAB ─────────────────────────────────────────────────────────────
+
+function LineChart({ points }) {
+  const C = useC();
+  const color = C.accent;
+  if (points.length < 2) return (
+    <div style={{ color: C.muted, fontSize: 12, textAlign: "center", padding: "20px 0" }}>
+      {T.logMoreSessions}
+    </div>
+  );
+  const W = 300, H = 60, pad = 6;
+  const vals = points.map(p => p.y);
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const range = max - min || 1;
+  const coords = points.map((p, i) => ({
+    x: pad + (i / (points.length - 1)) * (W - pad * 2),
+    y: H - pad - ((p.y - min) / range) * (H - pad * 2),
+  }));
+  const path = coords.map((c, i) => `${i === 0 ? "M" : "L"}${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(" ");
+  const area = `${path} L${coords[coords.length-1].x},${H} L${coords[0].x},${H} Z`;
+  return (
+    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible" }}>
+      <defs>
+        <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity=".25" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={area} fill="url(#g)" />
+      <path d={path} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      {coords.map((c, i) => (
+        <circle key={i} cx={c.x} cy={c.y} r={i === coords.length - 1 ? 4 : 2.5} fill={color} />
+      ))}
+    </svg>
+  );
+}
+
+function ProgressTab({ data }) {
+  const C = useC();
+  const T = useT();
+  const label = useLabel();
+  const divider = useDivider();
+  const [selEx, setSelEx] = useState(null);
+
+  const activeProg = data.programs.find(p => p.id === data.activeProgId);
+  const filteredLogs = data.logs.filter(l => l.progId === data.activeProgId);
+
+  // Build per-exercise history — keyed by "ExerciseName — DayLabel" to separate
+  // the same exercise done on different days (e.g. Leg Extension on Push vs Legs)
+  const parseW = (w) => Math.max(0, parseFloat(String(w).replace(/[^\d.]/g, "")) || 0);
+  const exMap = {};
+  [...filteredLogs].reverse().forEach(log => {
+    log.exercises.forEach(ex => {
+      const key = `${ex.name} — ${log.dayLabel}`;
+      if (!exMap[key]) exMap[key] = [];
+      const best = Math.max(0, ...ex.sets.map(s => parseW(s.weight)));
+      exMap[key].push({ date: log.date, best });
+    });
+  });
+
+  const names = Object.keys(exMap);
+  const current = selEx || names[0];
+  const pts = current ? exMap[current] : [];
+
+  if (!names.length) {
+    return (
+      <div style={{ ...page, display: "flex", alignItems: "center", justifyContent: "center", minHeight: "80vh" }}>
+        <div style={{ textAlign: "center", color: C.sub }}>
+          <div style={{ fontSize: 36, marginBottom: 12 }}>📈</div>
+          <div style={{ fontWeight: 600, fontSize: 16, color: C.text }}>No data yet</div>
+          <div style={{ fontSize: 13, marginTop: 6 }}>
+            {activeProg ? `${T.logFor} ${activeProg.name} ${T.toSeeProgress}` : T.logToSee}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const first = pts[0]?.best || 0;
+  const last = pts[pts.length - 1]?.best || 0;
+  const diff = last - first;
+
+  return (
+    <div style={page}>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 11, color: C.sub, letterSpacing: 2, fontWeight: 600, marginBottom: 4 }}>
+          {activeProg ? activeProg.name.toUpperCase() : T.allPrograms}
+        </div>
+        <div style={{ fontSize: 26, fontWeight: 700, color: C.text }}>Progress</div>
+      </div>
+
+      {/* Exercise picker */}
+      <div style={{ display: "flex", gap: 6, overflowX: "auto", marginBottom: 20, paddingBottom: 4 }}>
+        {names.map(n => (
+          <button key={n} onClick={() => setSelEx(n)} style={{
+            padding: "7px 12px", borderRadius: 20, whiteSpace: "nowrap",
+            background: current === n ? C.accent : C.surface,
+            border: `1px solid ${current === n ? C.accent : C.border}`,
+            color: current === n ? "#fff" : C.sub,
+            fontSize: 12, fontWeight: 600, cursor: "pointer",
+            fontFamily: F.heading,
+          }}>{n}</button>
+        ))}
+      </div>
+
+      <Card>
+        <div style={{ fontWeight: 700, fontSize: 16, color: C.text, marginBottom: 4 }}>{current}</div>
+        <div style={{ color: C.sub, fontSize: 12, marginBottom: 16 }}>{T.bestWeight}</div>
+        <LineChart points={pts.map(p => ({ y: p.best }))} />
+        <div style={divider} />
+        <div style={{ display: "flex", gap: 20 }}>
+          <div>
+            <div style={{ ...label, marginBottom: 2 }}>{T.starting}</div>
+            <div style={{ fontWeight: 700, fontSize: 20, color: C.text, fontFamily: F.mono }}>{first}</div>
+          </div>
+          <div>
+            <div style={{ ...label, marginBottom: 2 }}>{T.current}</div>
+            <div style={{ fontWeight: 700, fontSize: 20, color: C.accent, fontFamily: F.mono }}>{last}</div>
+          </div>
+          <div>
+            <div style={{ ...label, marginBottom: 2 }}>{T.change}</div>
+            <div style={{ fontWeight: 700, fontSize: 20, color: diff >= 0 ? C.green : "#f87171", fontFamily: F.mono }}>
+              {diff >= 0 ? "+" : ""}{diff}
+            </div>
+          </div>
+          <div>
+            <div style={{ ...label, marginBottom: 2 }}>{T.sessions}</div>
+            <div style={{ fontWeight: 700, fontSize: 20, color: C.text, fontFamily: F.mono }}>{pts.length}</div>
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ─── APP ──────────────────────────────────────────────────────────────────────
+
+// ─── ONBOARDING ───────────────────────────────────────────────────────────────
+
+function Onboarding({ onComplete }) {
+  const C = useC();
+  const T = useT();
+  const [step, setStep] = useState(0); // 0=welcome, 1=program name, 2=first day, 3=done
+  const [progName, setProgName] = useState("");
+  const [dayName, setDayName] = useState("");
+  const [exercises, setExercises] = useState(["", "", ""]);
+
+  const updateEx = (i, val) => {
+    const copy = [...exercises]; copy[i] = val; setExercises(copy);
+  };
+
+  const finish = () => {
+    const filledEx = exercises.filter(e => e.trim()).map(name => ({ name, sets: 3 }));
+    const program = {
+      id: Date.now().toString(),
+      name: progName.trim() || "My Program",
+      days: [{
+        label: dayName.trim() || "Day 1",
+        exercises: filledEx.length ? filledEx : [{ name: "Exercise 1", sets: 3 }],
+      }],
+    };
+    onComplete(program);
+  };
+
+  const canNext1 = progName.trim().length > 0;
+  const canNext2 = dayName.trim().length > 0 && exercises.some(e => e.trim());
+
+  // Progress dots
+  const Dots = () => (
+    <div style={{ display: "flex", gap: 6, justifyContent: "center", marginBottom: 32 }}>
+      {[0, 1, 2].map(i => (
+        <div key={i} style={{
+          width: i === step - 1 ? 20 : 6, height: 6, borderRadius: 3,
+          background: i < step ? C.accent : C.border,
+          transition: "all .3s",
+        }} />
+      ))}
+    </div>
+  );
+
+  // ── Step 0: Welcome ──
+  if (step === 0) return (
+    <div style={{
+      position: "fixed", inset: 0, background: C.bg,
+      display: "flex", flexDirection: "column",
+      alignItems: "center", justifyContent: "center",
+      padding: "0 32px", zIndex: 200,
+      fontFamily: F.heading,
+    }}>
+      <div style={{ fontSize: 48, marginBottom: 24 }}>🏋️</div>
+      <div style={{ fontWeight: 900, fontSize: 36, color: C.text, letterSpacing: -1.5, textAlign: "center", lineHeight: 1.1, marginBottom: 16 }}>
+        {T.welcomeTo}<br /><span style={{ color: C.accent }}>IronLog</span>
+      </div>
+      <div style={{ color: C.sub, fontSize: 15, textAlign: "center", lineHeight: 1.7, marginBottom: 48, maxWidth: 280 }}>
+        {T.trackLift}
+      </div>
+      <Btn onClick={() => setStep(1)} style={{ width: "100%", maxWidth: 320, padding: 16, fontSize: 16 }}>
+        Let's go →
+      </Btn>
+      <button onClick={() => onComplete(null)} style={{
+        background: "none", border: "none", color: C.muted,
+        fontSize: 13, marginTop: 16, cursor: "pointer", fontFamily: F.heading,
+      }}>{T.skipForNow}</button>
+    </div>
+  );
+
+  // ── Step 1: Program name ──
+  if (step === 1) return (
+    <div style={{
+      position: "fixed", inset: 0, background: C.bg,
+      display: "flex", flexDirection: "column",
+      padding: "0 24px", zIndex: 200, fontFamily: F.heading,
+      justifyContent: "center",
+    }}>
+      <Dots />
+      <div style={{ fontWeight: 900, fontSize: 30, color: C.text, letterSpacing: -1, marginBottom: 8 }}>
+        {T.nameYourProgram}
+      </div>
+      <div style={{ color: C.sub, fontSize: 14, marginBottom: 32, lineHeight: 1.6 }}>
+        {T.nameYourProgramSub}
+      </div>
+      <Inp
+        value={progName}
+        onChange={e => setProgName(e.target.value)}
+        placeholder={T.namePlaceholder}
+        style={{ fontSize: 18, padding: "14px 16px", marginBottom: 12 }}
+      />
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 32 }}>
+        {["Push Pull Legs", "Upper Lower", "Full Body", "5/3/1"].map(s => (
+          <button key={s} onClick={() => setProgName(s)} style={{
+            background: progName === s ? C.accentDim : C.surface,
+            border: `1px solid ${progName === s ? C.accent : C.border}`,
+            borderRadius: 20, padding: "6px 14px", fontSize: 12, fontWeight: 600,
+            color: progName === s ? C.accent : C.sub, cursor: "pointer", fontFamily: F.heading,
+          }}>{s}</button>
+        ))}
+      </div>
+      <Btn onClick={() => setStep(2)} disabled={!canNext1} style={{ width: "100%", padding: 16, fontSize: 16 }}>
+        Next →
+      </Btn>
+    </div>
+  );
+
+  // ── Step 2: First day + exercises ──
+  if (step === 2) return (
+    <div style={{
+      position: "fixed", inset: 0, background: C.bg,
+      display: "flex", flexDirection: "column",
+      padding: "0 24px", zIndex: 200, fontFamily: F.heading,
+      justifyContent: "center", overflowY: "auto",
+    }}>
+      <Dots />
+      <div style={{ fontWeight: 900, fontSize: 30, color: C.text, letterSpacing: -1, marginBottom: 8 }}>
+        {T.firstTrainingDay}
+      </div>
+      <div style={{ color: C.sub, fontSize: 14, marginBottom: 24, lineHeight: 1.6 }}>
+        {T.firstTrainingDaySub}
+      </div>
+
+      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: C.sub, textTransform: "uppercase", marginBottom: 8 }}>Day name</div>
+      <Inp value={dayName} onChange={e => setDayName(e.target.value)} placeholder={T.dayPlaceholderOB} style={{ marginBottom: 8 }} />
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 20 }}>
+        {["Push", "Pull", "Legs", "Upper", "Lower", "Full Body"].map(s => (
+          <button key={s} onClick={() => setDayName(s)} style={{
+            background: dayName === s ? C.accentDim : C.surface,
+            border: `1px solid ${dayName === s ? C.accent : C.border}`,
+            borderRadius: 20, padding: "5px 12px", fontSize: 12, fontWeight: 600,
+            color: dayName === s ? C.accent : C.sub, cursor: "pointer", fontFamily: F.heading,
+          }}>{s}</button>
+        ))}
+      </div>
+
+      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: C.sub, textTransform: "uppercase", marginBottom: 8 }}>Exercises</div>
+      {exercises.map((ex, i) => (
+        <Inp key={i} value={ex} onChange={e => updateEx(i, e.target.value)} placeholder={`Exercise ${i + 1}`} style={{ marginBottom: 8 }} />
+      ))}
+      <button onClick={() => setExercises([...exercises, ""])} style={{
+        background: "none", border: `1px dashed ${C.border}`, borderRadius: 8,
+        color: C.sub, padding: "10px", fontSize: 13, fontWeight: 600,
+        cursor: "pointer", fontFamily: F.heading, marginBottom: 24, width: "100%",
+      }}>{T.addExercise}</button>
+
+      <Btn onClick={finish} disabled={!canNext2} style={{ width: "100%", padding: 16, fontSize: 16 }}>
+        {T.startTraining}
+      </Btn>
+      <div style={{ textAlign: "center", marginTop: 14, fontSize: 12, color: C.muted, fontFamily: F.heading }}>
+        {T.moreDays} <span style={{ color: C.accent, fontWeight: 600 }}>{T.programTab}</span> {T.moreDays2}
+      </div>
+    </div>
+  );
+
+  return null;
+}
+
+
+export default function App() {
+  const [tab, setTab] = useState("session");
+  const [data, setData] = useState(load);
+  const [dark, setDark] = useState(() => {
+    try { return localStorage.getItem("ironlog_theme") !== "light"; } catch { return true; }
+  });
+  const [lang, setLang] = useState(() => {
+    try { return localStorage.getItem("ironlog_lang") || "en"; } catch { return "en"; }
+  });
+  const [deepLink, setDeepLink] = useState(null);
+  const [onboarded, setOnboarded] = useState(() => {
+    try { return localStorage.getItem("ironlog_onboarded") === "true" || data.programs.length > 0; } catch { return false; }
+  });
+
+  const C = dark ? DARK : LIGHT;
+  const T = LANGS[lang] || LANGS.en;
+  const showOnboarding = !onboarded && data.programs.length === 0;
+
+  const completeOnboarding = (program) => {
+    try { localStorage.setItem("ironlog_onboarded", "true"); } catch {}
+    setOnboarded(true);
+    if (program) {
+      const updated = { ...data, programs: [program], activeProgId: program.id };
+      setData(updated);
+      persist(updated);
+      setTab("session");
+    }
+  };
+
+  const toggleTheme = () => {
+    setDark(d => {
+      const next = !d;
+      try { localStorage.setItem("ironlog_theme", next ? "dark" : "light"); } catch {}
+      return next;
+    });
+  };
+
+  const cycleLang = () => {
+    const langs = ["en", "fr", "es"];
+    const next = langs[(langs.indexOf(lang) + 1) % langs.length];
+    setLang(next);
+    try { localStorage.setItem("ironlog_lang", next); } catch {}
+  };
+
+  const langLabel = { en: "EN", fr: "FR", es: "ES" };
+
+  useEffect(() => {
+    if (document.querySelector('link[href*="DM+Sans"]')) return;
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = "https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&family=DM+Mono&display=swap";
+    document.head.appendChild(link);
+  }, []);
+
+  return (
+    <ThemeCtx.Provider value={C}>
+    <LangCtx.Provider value={T}>
+      <div style={{
+        background: C.bg, minHeight: "100vh",
+        color: C.text, fontFamily: F.heading,
+        maxWidth: 430, margin: "0 auto", position: "relative",
+        transition: "background .25s, color .25s",
+      }}>
+        {showOnboarding && <Onboarding onComplete={completeOnboarding} />}
+
+        <div style={{
+          position: "sticky", top: 0, zIndex: 50,
+          background: C.bg + "ee", backdropFilter: "blur(10px)",
+          borderBottom: `1px solid ${C.border}`,
+          padding: "14px 16px",
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+        }}>
+          <div style={{ fontWeight: 800, fontSize: 19, letterSpacing: -0.5, color: C.text }}>
+            Iron<span style={{ color: C.accent }}>Log</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {/* Language toggle */}
+            <button onClick={cycleLang} style={{
+              background: C.surface, border: `1px solid ${C.border}`,
+              borderRadius: 20, padding: "5px 10px", cursor: "pointer",
+              fontSize: 11, fontWeight: 700, color: C.accent,
+              fontFamily: F.heading, letterSpacing: .5,
+            }}>{langLabel[lang]}</button>
+            {/* Theme toggle */}
+            <button onClick={toggleTheme} style={{
+              background: C.surface, border: `1px solid ${C.border}`,
+              borderRadius: 20, padding: "5px 10px", cursor: "pointer",
+              display: "flex", alignItems: "center", gap: 6,
+              transition: "background .2s",
+            }}>
+              <span style={{ fontSize: 14 }}>{dark ? "☀️" : "🌙"}</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: C.sub, fontFamily: F.heading }}>
+                {dark ? T.light : T.dark}
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {tab === "session"  && <SessionTab  data={data} setData={setData} setTab={setTab} setDeepLink={setDeepLink} />}
+        {tab === "history"  && <HistoryTab  data={data} setData={setData} />}
+        {tab === "progress" && <ProgressTab data={data} />}
+        {tab === "program"  && <ProgramTab  data={data} setData={setData} deepLink={deepLink} setDeepLink={setDeepLink} />}
+
+        <Nav tab={tab} setTab={setTab} />
+      </div>
+    </LangCtx.Provider>
+    </ThemeCtx.Provider>
+  );
+}
